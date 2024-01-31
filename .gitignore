@@ -1,0 +1,6 @@
+# python & pip
+venv/
+__pycache__/
+
+# vim temporary files
+.*.swp
