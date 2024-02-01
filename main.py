@@ -66,6 +66,9 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
             pass
 
 def print_contacts(contacts):
+    """
+    Just pretty print an overview.
+    """
     click.secho("The following (" + str(len(contacts)) + ") contacts were imported:", fg='green')
     for c in contacts:
         click.echo("---")
