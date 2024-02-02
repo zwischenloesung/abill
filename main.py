@@ -4,6 +4,7 @@ import click
 from glob import glob
 from datetime import datetime
 import os
+import shutil
 
 def date(field):
     """
@@ -20,8 +21,8 @@ def date(field):
 
 @click.command()
 @click.option('--end_marker', '-e', type=str, default='%', help='The closing marker to denote a variable in the template (e.g. "%FirstName%"; default: "%"; only valid if jinja2 is NOT used).')
-@click.option('--include', '-I', type=str, multiple=True, help='Arbitrary additional files to copy to the target dir, supports wildcards too.')
-@click.option('--jinja', '-J', is_flag=True, help='Use the mighty jinja2 engine to do the work (otherwise just the keywords are replaced).')
+@click.option('--include', '-i', type=str, multiple=True, help='Arbitrary additional files to copy to the target dir, supports wildcards too.')
+@click.option('--jinja', '-j', is_flag=True, help='Use the mighty jinja2 engine to do the work (otherwise just the keywords are replaced).')
 @click.option('--link', '-l', type=str, multiple=True, help='Arbitrary additional soft-links to create to the target dir, supports wildcards too.')
 @click.option('--dry_run', '-n', is_flag=True, help='Show what would be done, but do not change anything...')
 @click.option('--output_directory', '-o', type=str, help='Directory to put the output documents into.')
@@ -44,7 +45,7 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
     This little piece of software let's you do it your way.
 
     Example:
-      python -m main -n -V tests/com_example_crm.vcf -T "firstName:N:1" -T "lastName:N:0"
+      python -m main -n -V tests/com_example_crm.vcf -T "firstName:N:1" -T "lastName:N:0" -o outputdir
     """
     contacts = []
     include_file_list = []
@@ -75,11 +76,7 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
     if dry_run:
         print_contacts(contacts)
     else:
-        pass
-        #organize_output(output_directory)
-
-        if flavor == "TeX":
-            pass
+        organize_output(output_directory, include_file_list, template_file_list)
 
 def add_extra_mappings(extra_field, template_mapping_map) -> map:
     """
@@ -154,11 +151,13 @@ def create_mapping(template_mapping, template_mapping_separator, start_marker, e
             raise SystemExit
     return template_mapping_map
 
-def organize_output(output_directory):
+def organize_output(output_directory, include_file_list, template_file_list):
     try:
         os.makedirs(output_directory)
     except FileExistsError:
         pass
+    for f in include_file_list:
+        shutil.copy(f, output_directory)
 
 
 def parse_vcf(filename, addresslist=[]) -> list:
