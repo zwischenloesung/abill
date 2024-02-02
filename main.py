@@ -47,7 +47,7 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
     Example:
       python -m main -n -V tests/com_example_crm.vcf -T "firstName:N:1" -T "lastName:N:0" -o outputdir
     """
-    contacts = []
+    contact_list = []
     include_file_list = []
     template_file_list = []
     template_file_list = []
@@ -58,27 +58,33 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
     for t in template:
         for f in glob(t):
             template_file_list.append(f)
+        if len(template_file_list) < 1:
+            click.secho('Error: could not find a template file to edit', fg='red')
+            raise SystemExit
     for l in link:
         for f in glob(l):
             link_file_list.append(f)
     if vcf:
         for f in glob(vcf):
             vcf_file_list.append(f)
+        if len(vcf_file_list) < 1:
+            click.secho('Error: could not find a vcards file to parse', fg='red')
+            raise SystemExit
     else:
         click.error("Please provide a vcard file.")
         raise SystemExit
 
-    template_mapping_map = create_mapping(template_mapping, template_mapping_separator, start_marker, end_marker)
-    extra_mapping_map = add_extra_mappings(extra_field, {})
+    template_mapping_map = map_keywords(template_mapping, template_mapping_separator, start_marker, end_marker)
+    extra_mapping_map = add_extra_mapping(extra_field, {})
 
-    contacts = parse_contacts(template_mapping_map, vcf_file_list)
+    contact_list = parse_contacts(template_mapping_map, vcf_file_list, contact_list)
 
     if dry_run:
-        print_contacts(contacts)
+        print_contacts(contact_list)
     else:
-        organize_output(output_directory, include_file_list, template_file_list)
+        create_output(output_directory, include_file_list, contact_list, extra_mapping_map)
 
-def add_extra_mappings(extra_field, template_mapping_map) -> map:
+def add_extra_mapping(extra_field, template_mapping_map) -> map:
     """
     Add custom extra fields to the template editing map.
     """
@@ -101,12 +107,11 @@ def print_contacts(contacts):
         for f in c:
             click.echo("  " + f + ": " + c[f])
 
-def parse_contacts(template_mapping_map, vcf_file_list) -> list:
+def parse_contacts(template_mapping_map, vcf_file_list, contact_list) -> list:
     """
     Parse the .vcf files, only looking for the values of interest, that were collected in the
     mapping.
     """
-    contacts = []
     for cf in vcf_file_list:
         with open(cf, 'r') as f:
             state = None
@@ -119,7 +124,7 @@ def parse_contacts(template_mapping_map, vcf_file_list) -> list:
                     contact = {}
                 elif state and line == "END:VCARD":
                     state = None
-                    contacts.append(contact)
+                    contact_list.append(contact)
                 elif state:
                     for mapping in template_mapping_map:
                         if line.startswith(template_mapping_map[mapping]["name"] + ":"):
@@ -132,9 +137,9 @@ def parse_contacts(template_mapping_map, vcf_file_list) -> list:
                 else:
                     click.secho("WARNING: Unexpected content on line `" + i + "`:")
                     click.echo(line)
-    return contacts
+    return contact_list
 
-def create_mapping(template_mapping, template_mapping_separator, start_marker, end_marker) -> map:
+def map_keywords(template_mapping, template_mapping_separator, start_marker, end_marker) -> map:
     """
     Use the custom mapping provided on the CLI (or the default) to map the contents of the vcards
     in the .vcf to the keywords in the template.
@@ -151,14 +156,13 @@ def create_mapping(template_mapping, template_mapping_separator, start_marker, e
             raise SystemExit
     return template_mapping_map
 
-def organize_output(output_directory, include_file_list, template_file_list):
+def create_output(output_directory, include_file_list, template_file_list, mapping):
     try:
         os.makedirs(output_directory)
     except FileExistsError:
         pass
     for f in include_file_list:
         shutil.copy(f, output_directory)
-
 
 def parse_vcf(filename, addresslist=[]) -> list:
     return addresslist
