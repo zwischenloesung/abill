@@ -2,7 +2,21 @@
 
 import click
 from glob import glob
+from datetime import datetime
 import os
+
+def date(field):
+    """
+    Wrap datetime for shorter access.
+    """
+    n = datetime.now()
+    if field == 'y':
+        p = '{:%Y}'
+    elif field == 'm':
+        p = '{:%m}'
+    elif field == 'd':
+        p = '{:%d}'
+    return p.format(n)
 
 @click.command()
 @click.option('--end_marker', '-e', type=str, default='%', help='The closing marker to denote a variable in the template (e.g. "%FirstName%"; default: "%"; only valid if jinja2 is NOT used).')
@@ -16,8 +30,9 @@ import os
 @click.option('--template_mapping_separator', '-S', type=str, default=':', help='A character separating the key from the value in template_mapping (only valid if NOT jinja2; default: ":").')
 @click.option('--tex2pdf', '-p', is_flag=True, help='Assume the resulting document is written in TeX and try to convert it to PDF')
 @click.option('--start_marker', '-s', type=str, default='%', help='The opening marker to denote a variable in the template (e.g. "%FirstName%"; default: "%"; only valid if jinja2 is NOT used).')
+@click.option('--extra_field', '-x', type=str, multiple=True, default=[ 'dateYear:' + date('y'), 'dateMonth:' + date('m'), 'dateDay:' + date('d') ], help='Arbitrary number of additional extra fields that can be replaced in the template (default: "dateYear:' + date('y') + '", "dateMonth:' + date('m') + '", "dateDay:' + date('d') + '"')
 @click.option('--vcf', '-V', type=str, help='The vcards file(s) to get the personalized infos from (wildcards supported).')
-def main(end_marker, include, jinja, link, dry_run, output_directory, template, template_mapping, template_mapping_separator, tex2pdf, start_marker, vcf):
+def main(end_marker, include, jinja, link, dry_run, output_directory, template, template_mapping, template_mapping_separator, tex2pdf, start_marker, extra_field, vcf):
     """
     Sometimes it is just necessary to create a series of documents with
     common content but still personalized or slightly customized.
@@ -53,6 +68,7 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
         raise SystemExit
 
     template_mapping_map = create_mapping(template_mapping, template_mapping_separator, start_marker, end_marker)
+    extra_mapping_map = add_extra_mappings(extra_field, {})
 
     contacts = parse_contacts(template_mapping_map, vcf_file_list)
 
@@ -64,6 +80,19 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
 
         if flavor == "TeX":
             pass
+
+def add_extra_mappings(extra_field, template_mapping_map) -> map:
+    """
+    Add custom extra fields to the template editing map.
+    """
+    for x in extra_field:
+        s = x.split(":")
+        if len(s) != 2:
+            click.secho("Please check the input of `--extra_field`, '" + x + "' as it is not correct.'")
+            raise SystemExit
+        template_mapping_map[s[0]] = s[1]
+    return template_mapping_map
+
 
 def print_contacts(contacts):
     """
@@ -107,7 +136,6 @@ def parse_contacts(template_mapping_map, vcf_file_list) -> list:
                     click.secho("WARNING: Unexpected content on line `" + i + "`:")
                     click.echo(line)
     return contacts
-
 
 def create_mapping(template_mapping, template_mapping_separator, start_marker, end_marker) -> map:
     """
