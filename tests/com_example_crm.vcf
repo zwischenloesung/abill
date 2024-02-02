@@ -1,0 +1,28 @@
+BEGIN:VCARD
+VERSION:4.0
+PRODID:-//Test Suite 1.0
+UID:ffffffff-ffff-ffff-ffff-fffffffffffa
+FN:Emilia Xample
+N:Xample;Emilia;;;
+NICKNAME:sampy
+ADR;TYPE=HOME:;;Samplestreet 0;Sampletown;;0000;Example
+EMAIL;TYPE=HOME:e.xample@example.org
+TEL;TYPE=HOME,VOICE:
+CATEGORIES:RegularExample
+NOTE:Do not think this is a real person, it is not; Just an example;
+REV;VALUE=DATE-AND-OR-TIME:19700101T000000Z
+END:VCARD
+BEGIN:VCARD
+VERSION:4.0
+PRODID:-//Test Suite 1.0
+UID:00000000-0000-0000-0000-000000000000
+FN:Eduard Xample
+N:Xample;Eduard;;;
+NICKNAME:unreal
+ADR;TYPE=HOME:;;Samplestreet 0;Sampletown;;0000;Example
+EMAIL;TYPE=HOME:e.xample@example.net
+TEL;TYPE=HOME,VOICE:
+CATEGORIES:RegularExample
+NOTE:Do not think this is a real person, it is not; Just an other example;
+REV;VALUE=DATE-AND-OR-TIME:19700101T000000Z
+END:VCARD
