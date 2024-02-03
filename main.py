@@ -4,6 +4,7 @@ import click
 from glob import glob
 from datetime import datetime
 import os
+import re
 import shutil
 
 def date(field):
@@ -47,7 +48,6 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
     Example:
       python -m main -n -V tests/com_example_crm.vcf -T "firstName:N:1" -T "lastName:N:0" -o outputdir
     """
-    contact_list = []
     include_file_list = []
     template_file_list = []
     template_file_list = []
@@ -75,16 +75,16 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
         raise SystemExit
 
     template_mapping_map = map_keywords(template_mapping, template_mapping_separator, start_marker, end_marker)
-    extra_mapping_map = add_extra_mapping(extra_field, {})
+    extra_mapping_map = add_extra_mapping(extra_field, {}, start_marker, end_marker)
 
-    contact_list = parse_contacts(template_mapping_map, vcf_file_list, contact_list)
+    contact_list = parse_contacts(template_mapping_map, vcf_file_list, [])
 
     if dry_run:
         print_contacts(contact_list)
     else:
-        create_output(output_directory, include_file_list, contact_list, extra_mapping_map)
+        create_output(output_directory, include_file_list, template_file_list, contact_list, extra_mapping_map)
 
-def add_extra_mapping(extra_field, template_mapping_map) -> map:
+def add_extra_mapping(extra_field, extra_map, start_marker, end_marker) -> map:
     """
     Add custom extra fields to the template editing map.
     """
@@ -93,8 +93,8 @@ def add_extra_mapping(extra_field, template_mapping_map) -> map:
         if len(s) != 2:
             click.secho("Please check the input of `--extra_field`, '" + x + "' as it is not correct.'")
             raise SystemExit
-        template_mapping_map[s[0]] = s[1]
-    return template_mapping_map
+        extra_map[start_marker + s[0] + end_marker] = s[1]
+    return extra_map
 
 
 def print_contacts(contacts):
@@ -129,10 +129,11 @@ def parse_contacts(template_mapping_map, vcf_file_list, contact_list) -> list:
                     for mapping in template_mapping_map:
                         if line.startswith(template_mapping_map[mapping]["name"] + ":"):
                             nl = line.split(":", 1)
-                            if template_mapping_map[mapping]["part"]:
-                                nl = nl[1].split(";")
-                                contact[mapping] = nl[int(template_mapping_map[mapping]["part"])]
-                            else:
+                            try:
+                                if template_mapping_map[mapping]["part"]:
+                                    nl = nl[1].split(";")
+                                    contact[mapping] = nl[int(template_mapping_map[mapping]["part"])]
+                            except KeyError:
                                 contact[mapping] = nl[1]
                 else:
                     click.secho("WARNING: Unexpected content on line `" + i + "`:")
@@ -156,13 +157,28 @@ def map_keywords(template_mapping, template_mapping_separator, start_marker, end
             raise SystemExit
     return template_mapping_map
 
-def create_output(output_directory, include_file_list, template_file_list, mapping):
+def create_output(output_directory, include_file_list, template_file_list, contact_list, extra_mapping_map):
     try:
         os.makedirs(output_directory)
     except FileExistsError:
         pass
-    for f in include_file_list:
-        shutil.copy(f, output_directory)
+    try:
+        for include_file_name in include_file_list:
+            shutil.copy(include_file_name, output_directory)
+        for template_file_name in template_file_list:
+            output_file_name = output_directory + re.sub('/.*/', '', template_file_name)
+            with open(template_file_name, 'r') as template_file:
+                with open(output_file_name, 'w') as output_file:
+                    for line in template_file:
+                        for extra_mapping in extra_mapping_map:
+                            line = line.replace(extra_mapping, extra_mapping_map[extra_mapping])
+                        for contact in contact_list:
+                            for contact_mapping in contact:
+                                line = line.replace(contact_mapping, contact[contact_mapping])
+                        print(line)
+    except Exception as e:
+        print('TODO: Not good...', e)
+        raise SystemExit
 
 def parse_vcf(filename, addresslist=[]) -> list:
     return addresslist
