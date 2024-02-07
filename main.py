@@ -84,7 +84,7 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
     if dry_run:
         print_contacts(contact_list)
     elif output_directory != None:
-        create_output(output_directory, include_file_list, template_file_list, contact_list, extra_mapping_map)
+        create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map)
 
 def add_extra_mapping(extra_field, extra_map, start_marker, end_marker) -> map:
     """
@@ -148,7 +148,6 @@ def parse_contacts(template_mapping_map, template_mapping_unique, vcf_file_list,
                             uid += '.' + nl[int(u[1])]
                     if uid != '':
                         uid = sanitize(uid[1:])
-                        print(uid)
                         if uids.get(uid) != None:
                             click.secho('Error: The identifier "' + uid + '" is not UNIQUE, either the vcards file contains duplicates or you have chosen a wrong group of fields as UID (-U).', fg='red')
                             raise SystemExit
@@ -187,28 +186,30 @@ def map_keywords(template_mapping, template_mapping_separator, start_marker, end
             raise SystemExit
     return template_mapping_map
 
-def create_output(output_directory, include_file_list, template_file_list, contact_list, extra_mapping_map):
-    try:
-        os.makedirs(output_directory)
-    except FileExistsError:
-        pass
+def create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map):
     try:
         for contact in contact_list:
-            output_directory += contact['uid']
-#            for include_file_name in include_file_list:
-#                shutil.copy(include_file_name, output_directory)
-#            for template_file_name in template_file_list:
-#                output_file_name = output_directory + re.sub('/.*/', '', template_file_name)
-#                with open(template_file_name, 'r') as template_file:
-#                    with open(output_file_name, 'w') as output_file:
-#                        print(output_file_name)
-#                        for line in template_file:
-#                            for extra_mapping in extra_mapping_map:
-#                                line = line.replace(extra_mapping, extra_mapping_map[extra_mapping])
-#                            for contact in contact_list:
-#                                for contact_mapping in contact:
-#                                    line = line.replace(contact_mapping, contact[contact_mapping])
-                           #print(line)
+            od = output_directory + "/" + contact['uid'] + "/"
+            try:
+                os.makedirs(od)
+            except FileExistsError:
+                pass
+            for include_file_name in include_file_list:
+                shutil.copy(include_file_name, od)
+            for link_name in link_file_list:
+                os.symlink(link_name, os)
+            for template_file_name in template_file_list:
+                output_file_name = od + re.sub('/.*/', '', template_file_name)
+                with open(template_file_name, 'r') as template_file:
+                    with open(output_file_name, 'w') as output_file:
+                        print(output_file_name)
+                        for line in template_file:
+                            for extra_mapping in extra_mapping_map:
+                                line = line.replace(extra_mapping, extra_mapping_map[extra_mapping])
+                            for contact in contact_list:
+                                for contact_mapping in contact:
+                                    line = line.replace(contact_mapping, contact[contact_mapping])
+                            output_file.write(line)
     except Exception as e:
         print('TODO: Not good...', e)
         raise SystemExit
