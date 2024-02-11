@@ -31,12 +31,13 @@ def date(field):
 @click.option('--template', '-t', type=str, multiple=True, help='Arbitrary number of files to edit as the document, supports wildcards too.')
 @click.option('--template_mapping', '-T', type=str, default=[ "firstName:N:1", "lastName:N:0", "streetAddress:ADR;TYPE=HOME:2", "postalCodeAddress:ADR;TYPE=HOME:5", "cityAddress:ADR;TYPE=HOME:3", "countryAddress:ADR;TYPE=HOME:6" ], multiple=True, help='Arbitrary number of mappings from string in template to vcard-field (default: "firstName:N[:1]"; the third part optional and only for fields that have more then one value).')
 @click.option('--template_mapping_separator', '-S', type=str, default=':', help='A character separating the key from the value in template_mapping (only valid if NOT jinja2; default: ":").')
-@click.option('--template_mapping_unique', '-U', type=str, default=[ "N:0", "N:1" ], multiple=True, help='Some string building a unique identifier per contact (default: -U "N:0" -U "N:1").')
+@click.option('--template_mapping_unique', '-U', type=str, default=[ "N:0", "N:1" ], multiple=True, help='Select fields from the vcard in order to generate a unique identifier per contact (default: -U "N:0" -U "N:1"). Make sure it really is unique...')
+@click.option('--template_filename_unique', '-u', is_flag=True, default=False, help='This flag only affects the name of files generated from templates and makes the filename itself unique by adding the contact-id (see `-U`) just before the suffix (or at the end if there is no ".").')
 @click.option('--tex2pdf', '-p', is_flag=True, help='Assume the resulting document is written in TeX and try to convert it to PDF')
 @click.option('--start_marker', '-s', type=str, default='%', help='The opening marker to denote a variable in the template (e.g. "%FirstName%"; default: "%"; only valid if jinja2 is NOT used).')
 @click.option('--extra_field', '-x', type=str, multiple=True, default=[ 'dateYear:' + date('y'), 'dateMonth:' + date('m'), 'dateDay:' + date('d') ], help='Arbitrary number of additional extra fields that can be replaced in the template (default: "dateYear:' + date('y') + '", "dateMonth:' + date('m') + '", "dateDay:' + date('d') + '"')
 @click.option('--vcf', '-V', type=str, required=True, help='The vcards file(s) to get the personalized infos from (wildcards supported).')
-def main(end_marker, include, jinja, link, dry_run, output_directory, template, template_mapping, template_mapping_separator, template_mapping_unique, tex2pdf, start_marker, extra_field, vcf):
+def main(end_marker, include, jinja, link, dry_run, output_directory, template, template_mapping, template_mapping_separator, template_mapping_unique, template_filename_unique, tex2pdf, start_marker, extra_field, vcf):
     """
     Sometimes it is just necessary to create a series of documents with
     common content but still personalized or slightly customized.
@@ -84,7 +85,7 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
     if dry_run:
         print_contacts(contact_list)
     elif output_directory != None:
-        create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map)
+        create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map, template_filename_unique)
 
 def add_extra_mapping(extra_field, extra_map, start_marker, end_marker) -> map:
     """
@@ -186,7 +187,7 @@ def map_keywords(template_mapping, template_mapping_separator, start_marker, end
             raise SystemExit
     return template_mapping_map
 
-def create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map):
+def create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map, template_filename_unique):
     try:
         for contact in contact_list:
             od = output_directory + "/" + contact['uid'] + "/"
@@ -199,16 +200,20 @@ def create_output(output_directory, include_file_list, link_file_list, template_
             for link_name in link_file_list:
                 os.symlink(link_name, os)
             for template_file_name in template_file_list:
-                output_file_name = od + re.sub('/.*/', '', template_file_name)
+                ofbn = template_file_name.rsplit('/', 1)[1]
+                if template_filename_unique:
+                    ofbname = ofbn.rsplit('.', 1)
+                    output_file_name = od + ofbname[0] + '.' + contact['uid'] + '.' + ofbname[1]
+                else:
+                    output_file_name = od + ofbn
                 with open(template_file_name, 'r') as template_file:
                     with open(output_file_name, 'w') as output_file:
                         print(output_file_name)
                         for line in template_file:
                             for extra_mapping in extra_mapping_map:
                                 line = line.replace(extra_mapping, extra_mapping_map[extra_mapping])
-                            for contact in contact_list:
-                                for contact_mapping in contact:
-                                    line = line.replace(contact_mapping, contact[contact_mapping])
+                            for contact_mapping in contact:
+                                line = line.replace(contact_mapping, contact[contact_mapping])
                             output_file.write(line)
     except Exception as e:
         print('TODO: Not good...', e)
