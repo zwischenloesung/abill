@@ -77,17 +77,19 @@ def main(end_marker, include, jinja, link, dry_run, output_directory, template, 
         click.error("Please provide a vcard file.")
         raise SystemExit
 
-    template_mapping_map = map_keywords(template_mapping, template_mapping_separator, start_marker, end_marker)
-    extra_mapping_map = add_extra_mapping(extra_field, {}, start_marker, end_marker)
+    template_mapping_map = map_keywords(template_mapping, template_mapping_separator)
+    extra_mapping_map = add_extra_mapping(extra_field, {})
 
-    contact_list = parse_contacts(template_mapping_map, template_mapping_unique, vcf_file_list, [])
+    contact_list = parse_contacts([], vcf_file_list, template_mapping_map, template_mapping_unique)
 
     if dry_run:
         print_contacts(contact_list)
     elif output_directory != None:
-        create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map, template_filename_unique)
+        create_output(output_directory, include_file_list, link_file_list, \
+                template_file_list, contact_list, extra_mapping_map, \
+                template_filename_unique, start_marker, end_marker)
 
-def add_extra_mapping(extra_field, extra_map, start_marker, end_marker) -> map:
+def add_extra_mapping(extra_field, extra_map) -> dict:
     """
     Add custom extra fields to the template editing map.
     """
@@ -96,7 +98,7 @@ def add_extra_mapping(extra_field, extra_map, start_marker, end_marker) -> map:
         if len(s) != 2:
             click.secho("Please check the input of `--extra_field`, '" + x + "' as it is not correct.'")
             raise SystemExit
-        extra_map[start_marker + s[0] + end_marker] = s[1]
+        extra_map[s[0]] = s[1]
     return extra_map
 
 def print_contacts(contacts):
@@ -109,7 +111,7 @@ def print_contacts(contacts):
         for f in c:
             click.echo("  " + f + ": " + c[f])
 
-def parse_contacts(template_mapping_map, template_mapping_unique, vcf_file_list, contact_list) -> list:
+def parse_contacts(contact_list, vcf_file_list, template_mapping_map, template_mapping_unique) -> list:
     """
     Parse the .vcf files, only looking for the values of interest, that were collected in the
     mapping.
@@ -170,7 +172,7 @@ def sanitize(text, do_german_style=False) -> str:
     text = re.sub('\W+', '_', text)
     return unidecode(text)
 
-def map_keywords(template_mapping, template_mapping_separator, start_marker, end_marker) -> map:
+def map_keywords(template_mapping, template_mapping_separator) -> dict:
     """
     Use the custom mapping provided on the CLI (or the default) to map the contents of the vcards
     in the .vcf to the keywords in the template.
@@ -179,15 +181,17 @@ def map_keywords(template_mapping, template_mapping_separator, start_marker, end
     for m in template_mapping:
         tm = m.split(template_mapping_separator)
         if len(tm) == 2:
-            template_mapping_map[start_marker + tm[0] + end_marker] = { "name": tm[1] }
+            template_mapping_map[tm[0]] = { "name": tm[1] }
         elif len(tm) >= 2:
-            template_mapping_map[start_marker + tm[0] + end_marker] = { "name": tm[1], "part": tm[2] }
+            template_mapping_map[tm[0]] = { "name": tm[1], "part": tm[2] }
         else:
             click.secho("ERROR: Could not parse the template_mapping", fg='red')
             raise SystemExit
     return template_mapping_map
 
-def create_output(output_directory, include_file_list, link_file_list, template_file_list, contact_list, extra_mapping_map, template_filename_unique):
+def create_output(output_directory, include_file_list, link_file_list, \
+        template_file_list, contact_list, extra_mapping_map, \
+        template_filename_unique, start_marker, end_marker):
     try:
         for contact in contact_list:
             od = output_directory + "/" + contact['uid'] + "/"
@@ -203,7 +207,8 @@ def create_output(output_directory, include_file_list, link_file_list, template_
                 ofbn = template_file_name.rsplit('/', 1)[1]
                 if template_filename_unique:
                     ofbname = ofbn.rsplit('.', 1)
-                    output_file_name = od + ofbname[0] + '.' + contact['uid'] + '.' + ofbname[1]
+                    output_file_name = od + ofbname[0] + '.' + \
+                            contact['uid'] + '.' + ofbname[1]
                 else:
                     output_file_name = od + ofbn
                 with open(template_file_name, 'r') as template_file:
@@ -211,9 +216,13 @@ def create_output(output_directory, include_file_list, link_file_list, template_
                         print(output_file_name)
                         for line in template_file:
                             for extra_mapping in extra_mapping_map:
-                                line = line.replace(extra_mapping, extra_mapping_map[extra_mapping])
+                                line = line.replace(start_marker + \
+                                        extra_mapping + end_marker, \
+                                        extra_mapping_map[extra_mapping])
                             for contact_mapping in contact:
-                                line = line.replace(contact_mapping, contact[contact_mapping])
+                                line = line.replace(start_marker + \
+                                        contact_mapping + end_marker, \
+                                        contact[contact_mapping])
                             output_file.write(line)
     except Exception as e:
         print('TODO: Not good...', e)
